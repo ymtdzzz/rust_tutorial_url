@@ -9,7 +9,7 @@ env:
     # CLI の名前を定義
     - NAME=url
 
-# Linux と macOS と Windows の環境でビルドする
+# Linux と macOS と Windows の環境でビルドする。
 matrix:
   include:
     - env: TARGET=x86_64-unknown-linux-musl
