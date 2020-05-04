@@ -1,3 +1,60 @@
 dist: trusty
 language: rust
 services: docker
+rust:
+  - stable
+sudo: required
+env:
+  global:
+    # CLI の名前を定義
+    - NAME=url
+
+# Linux と macOS と Windows の環境でビルドする
+matrix:
+  include:
+    - env: TARGET=x86_64-unknown-linux-musl
+    - env: TARGET=x86_64-apple-darwin
+      os: osx
+    - env: TARGET=x86_64-pc-windows-gnu
+
+before_install:
+  # ビルドツールをインストールする前に Rust のツールチェインを最新版に更新
+  - rustup self update
+
+install:
+  # cross ツールのインストール
+  - source ~/.cargo/env
+  - cargo install --force cross
+
+script:
+  # cache が有効になるようにリリースビルドでテストを実行
+  - cross test --target $TARGET --release
+
+before_deploy:
+  # リリースビルドを実行
+  - cross build --target $TARGET --release
+  - bin=$NAME
+  # windows のみ拡張子の exe がバイナリネームとなる
+  - if [[ $TARGET = "x86_64-pc-windows-gnu" ]]; then bin=$NAME.exe; fi
+  # ソースディレクトリ直下に配布用のパッケージを作成
+  - tar czf $NAME=$TRAVIS_TAG-$TARGET.tar.gz -C target/$TARGET/release $bin
+
+deploy:
+  api_key:
+    secure: "dK3CurN3oeBy0uvHA9fbV6zvCG801mdDSCSvsXXj8vwB3zmR6pI8c/ZW4MS9pPGIv1U9XnkepxxrgWBtv6SSliJKh8Psmfr7abgxUl4g+MC5dp/U9LC2CU75dcb4+uaqAARZ8FM0oHMV6TBBxeKfQNai1+HL+FQ1MANm5lvjJ9RVp0Lo6CS4HRv6PW7KyMaLh9AcZ6996KOcl4JQT7G3YfO2kJ5LIOr7jCymMWpX9LDiGAZnjNxjgFkU8UCyovLsGK8FFNQVILb09/kF6/uRTv7eySLFGU9agIiexuok0Nf6djCnH5bpVf08OGLXpHlLAv4zHVzJc1odJmpdhxibV7ao2zBuzUqQrt3vx6Ags2HH3L+dzGCQ+8vSeMgzXBcKppOE/mYOW9ESGb3RM3G/Epz7LV4lu9G6jlF//5OBI9s53aLIvyFYY5D8wjEGuci5baEvKOwYO1ubN+il6sSInJtmDeP7g+qWClqEAQBJ1oIxjDbU4MiGXBwC178SbKtlaLjsZM5Y/LTFkTN9q1+gYDcpobnGmXXv1wLGaQBbtKljlQaOY5ee81iuAuCh50zcgeSt0ZlfCuFOT4ufP0iXmxjr/GH7f7XK2wrBEABuDCpStJJZPJiViKkW1RkD5prwixMnkcRTKh//tIszaO/KiVY//qfoj2qg5jLasW4qdDk="
+  file_glob: true
+  file: $NAME=$TRAVIS_TAG-$TARGET.*
+  on:
+    tags: true
+  provider: releases
+  skip_cleanup: true
+
+cache: cargo
+before_cache:
+  - chmod -R a+r $HOME/.cargo
+
+branches:
+  only:
+    # for release tags
+    - /^v?\d+\.\d+\.\d+.*$/
+    - master
